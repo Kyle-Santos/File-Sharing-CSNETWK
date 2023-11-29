@@ -19,6 +19,7 @@ public class FileExchangeServer {
     private static List<String> registeredUsers = new ArrayList<>();
     private static int connectedClients = 0;
     private static String serverDir =  "../../../../../ServerStorage";
+    private static String clientDir =  "../../../../../ClientStorage/";
     
     public static void main(String[] args) {
         int nPort = Integer.parseInt(args[0]);
@@ -47,7 +48,6 @@ public class FileExchangeServer {
 
                         String command;
                         while ((command = reader.readLine()) != null) {
-                            System.out.println(command);
                             // Broadcast the message to all other clients (excluding the sender)
                             String result = processCommand(command, dataIn, dataOut, writer);
                             writer.println(result);
@@ -82,7 +82,7 @@ public class FileExchangeServer {
 
     private static String processCommand(String command, DataInputStream dataIn, DataOutputStream dataOut, PrintWriter writer) throws IOException {
         // Add your logic to process the command and return the result
-        System.out.println("Server: Received command - " + command);
+        System.out.println("Server: Received command - " + command + "\n");
         String[] tokens = command.split(" ");
         String cmd = tokens[0];
 
@@ -92,6 +92,7 @@ public class FileExchangeServer {
                     return "exists";
                 } else {
                     registeredUsers.add(tokens[1]);
+                    new File(clientDir + tokens[1]).mkdir();
                     return "registered"; 
                 }
             case "/store":

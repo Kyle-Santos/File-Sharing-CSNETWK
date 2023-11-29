@@ -1,16 +1,23 @@
 package com.fes;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 
 public class Client {
+    private static String clientDir =  "../../../../../ClientStorage/";
     public static void main(String[] args) {
         Scanner scan = new Scanner(System.in);
 		String[] join;
+        String username = "";
         String sServerAddress = "localhost";
         int nPort = 4020;
         boolean running = true;
@@ -62,23 +69,56 @@ public class Client {
                             } else {
                                 writer.println(input);
                                 response = reader.readLine();
+
+                                System.out.println("\nUsername: " + command[1] + " " + response + ".");    
+
                                 // check if username do not exist
                                 if (!response.equals("exists")) {
                                     registered = true;
+                                    username = command[1];
+                                    System.out.println("\nWelcome " + command[1] + "!");   
                                 }
-                                System.out.println("\nUsername: " + command[1] + " " + response + ".");    
                             }
                         } else {
                             System.out.println("\nUsage: /register <handle>");
                         }
                         break;
                     case "/store":
+                        String fileName = command[1];
+                        File fileToSend = new File(clientDir + username + "/" + fileName);
+                        OutputStream outputStream = clientSocket.getOutputStream();
+            
+                        // Check if the file exists
+                        if (!fileToSend.exists()) {
+                            System.out.println("Error: File not found.");
+                            break;
+                        }
+                        
+                        // Send the file name to the server
+                        writer.println(input);
+            
+                        // Create a FileInputStream to read the file
+                        FileInputStream fileInputStream = new FileInputStream(fileToSend);
+            
+                        // Buffer for reading data
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+            
+                        // Read data from the file and send to the server
+                        while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+                        LocalDateTime timestamp = LocalDateTime.now();
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+                        System.out.println(username + "<" + timestamp.format(formatter) + ">: Uploaded " + fileName);
+                        break;
                     case "/dir":
                         if (registered) {
                             writer.println(input);
 
-                            System.out.println("\n----------------------\n" +
-                                "     Server Files:\n----------------------");
+                            System.out.println("\n---------------------------\n" +
+                                "     Server Directory:\n---------------------------");
                             
                             while (!(response = reader.readLine()).equals("END")) {
                                 System.out.println(response); // Display each file name
@@ -87,8 +127,9 @@ public class Client {
                         } else {
                             System.out.println("\nRegister yourself first. Usage: /register <handle>");
                         }
-                        break;
+                        break;         
                     case "/get":
+                        break;
                     case "/?":
                         showCommands();
                         break;
