@@ -1,8 +1,10 @@
 package com.fes;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -16,7 +18,6 @@ public class Client {
     private static String clientDir =  "../../../../../ClientStorage/";
     public static void main(String[] args) {
         Scanner scan = new Scanner(System.in);
-		String[] join;
         String username = "";
         String sServerAddress = "localhost";
         int nPort = 4020;
@@ -42,13 +43,12 @@ public class Client {
 		// }
 
         try {
-            Socket clientSocket = new Socket(sServerAddress, nPort);
-            System.out.println("\nConnected to server at " + clientSocket.getRemoteSocketAddress() + "\n");
+            Socket serverSocket = new Socket(sServerAddress, nPort);
+            System.out.println("\nConnected to server at " + serverSocket.getRemoteSocketAddress() + "\n");
 
             System.out.println("Connection to the File Exchange Server is successful!");
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(serverSocket.getInputStream()));
+            PrintWriter writer = new PrintWriter(serverSocket.getOutputStream(), true);
             
             while (running) {
                 System.out.print("\nEnter command: ");
@@ -70,48 +70,52 @@ public class Client {
                                 writer.println(input);
                                 response = reader.readLine();
 
-                                System.out.println("\nUsername: " + command[1] + " " + response + ".");    
+                                System.out.println("\n" + response);   
 
                                 // check if username do not exist
-                                if (!response.equals("exists")) {
+                                if (!response.contains("exists")) {
                                     registered = true;
                                     username = command[1];
-                                    System.out.println("\nWelcome " + command[1] + "!");   
                                 }
                             }
                         } else {
-                            System.out.println("\nUsage: /register <handle>");
+                            System.out.println("\nError: Command parameters do not match or is not allowed.");
                         }
                         break;
                     case "/store":
-                        String fileName = command[1];
-                        File fileToSend = new File(clientDir + username + "/" + fileName);
-                        OutputStream outputStream = clientSocket.getOutputStream();
-            
-                        // Check if the file exists
-                        if (!fileToSend.exists()) {
-                            System.out.println("Error: File not found.");
-                            break;
-                        }
-                        
-                        // Send the file name to the server
-                        writer.println(input);
-            
-                        // Create a FileInputStream to read the file
-                        FileInputStream fileInputStream = new FileInputStream(fileToSend);
-            
-                        // Buffer for reading data
-                        byte[] buffer = new byte[1024];
-                        int bytesRead;
-            
-                        // Read data from the file and send to the server
-                        while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                            outputStream.write(buffer, 0, bytesRead);
-                        }
-                        LocalDateTime timestamp = LocalDateTime.now();
-                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                        if (registered) {
+                            String fileName = command[1];
+                            File fileToSend = new File(clientDir + username + "/" + fileName);
+                            OutputStream outputStream = serverSocket.getOutputStream();
+                
+                            // Check if the file exists
+                            if (!fileToSend.exists()) {
+                                System.out.println("Error: File not found.");
+                                break;
+                            }
+                            
+                            // Send the file name to the server
+                            writer.println(input);
+                
+                            // Create a FileInputStream to read the file
+                            FileInputStream fileInputStream = new FileInputStream(fileToSend);
+                
+                            // Buffer for reading data
+                            byte[] buffer = new byte[1024];
+                            int bytesRead;
+                
+                            // Read data from the file and send to the server
+                            while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                                outputStream.write(buffer, 0, bytesRead);
+                            }
+                            LocalDateTime timestamp = LocalDateTime.now();
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-                        System.out.println(username + "<" + timestamp.format(formatter) + ">: Uploaded " + fileName);
+                            System.out.println("\n" + username + "<" + timestamp.format(formatter) + ">: Uploaded " + fileName);
+                            fileInputStream.close();
+                        } else {
+                            System.out.println("\nRegister yourself first. Usage: /register <handle>");
+                        }
                         break;
                     case "/dir":
                         if (registered) {
@@ -123,31 +127,65 @@ public class Client {
                             while (!(response = reader.readLine()).equals("END")) {
                                 System.out.println(response); // Display each file name
                             }
-
+                            reader.readLine();
                         } else {
                             System.out.println("\nRegister yourself first. Usage: /register <handle>");
                         }
                         break;         
                     case "/get":
+                        if (registered) {
+                            String fileName1 = command[1];
+                            
+                            writer.println(input);
+                            response = reader.readLine();
+
+                            if (response.startsWith("Error")) {
+                                System.out.println("\n" + response);
+                            } else {
+                                File receievedFile = new File(clientDir + username + "/" + fileName1);
+                                FileOutputStream fileOutputStream = new FileOutputStream(receievedFile);
+                                // InputStream dataIn = serverSocket.getInputStream();
+                                DataInputStream dataIn = new DataInputStream(serverSocket.getInputStream());
+                                
+                                // get file size
+                                long fileSize = dataIn.readLong();
+
+                                // Buffer for reading data
+                                byte[] buffer = new byte[1024];
+                                long totalBytesRead = 0;
+                                int bytesRead;
+
+                                // Read data from the server and save it to the file
+                                while (fileSize > totalBytesRead && (bytesRead = dataIn.read(buffer)) != -1) {
+                                    fileOutputStream.write(buffer, 0, bytesRead);
+                                    totalBytesRead += bytesRead;
+                                }
+
+                                // reader.readLine();
+
+                                System.out.println("\nFile receieved from server: " + fileName1);
+                                fileOutputStream.close();
+                            }
+                        } else {
+                            System.out.println("\nRegister yourself first. Usage: /register <handle>");
+                        }
                         break;
                     case "/?":
                         showCommands();
                         break;
                     default:
-                        System.out.println("\nInvalid Command.");
+                        System.out.println("\nError: Command not found.");
                         break;
                 }
-
-                // Read and display the server's response
             }
 
             // Close resources, perform cleanup, etc.
-            clientSocket.close();
+            serverSocket.close();
             System.out.println("\nConnection closed. Thank you!");
             scan.close();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("\nError: Connection to the Server has failed! Please check IP Address and Port Number.");
         }
     }
 

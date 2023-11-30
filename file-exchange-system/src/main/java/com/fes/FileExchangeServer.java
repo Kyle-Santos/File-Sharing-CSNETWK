@@ -49,8 +49,7 @@ public class FileExchangeServer {
                         String command;
                         while ((command = reader.readLine()) != null) {
                             // Broadcast the message to all other clients (excluding the sender)
-                            String result = processCommand(command, dataIn, dataOut, writer);
-                            writer.println(result);
+                            processCommand(command, dataIn, dataOut, writer);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -76,11 +75,12 @@ public class FileExchangeServer {
                 clientThread.start();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
+            System.out.println("\nServer closed.");
         }
     }
 
-    private static String processCommand(String command, DataInputStream dataIn, DataOutputStream dataOut, PrintWriter writer) throws IOException {
+    private static void processCommand(String command, DataInputStream dataIn, DataOutputStream dataOut, PrintWriter writer) throws IOException {
         // Add your logic to process the command and return the result
         System.out.println("Server: Received command - " + command + "\n");
         String[] tokens = command.split(" ");
@@ -89,29 +89,36 @@ public class FileExchangeServer {
         switch (cmd.toLowerCase()) {
             case "/register":
                 if (registeredUsers.contains(tokens[1])) {
-                    return "exists";
+                    writer.println("Error: Registration failed. Handle or alias already exists.");
                 } else {
                     registeredUsers.add(tokens[1]);
                     new File(clientDir + tokens[1]).mkdir();
-                    return "registered"; 
+                    writer.println("Welcome " + tokens[1] + "!"); 
                 }
+                break;
             case "/store":
                 if (tokens.length > 1) {
                     storeFile(dataIn, tokens[1]);
-                    return "\nFile stored successfully";
+                    writer.println("File stored successfully");
                 }
                 break;
-            case "/fetch":
+            case "/get":
                 if (tokens.length > 1) {
-                    fetchFile(dataOut, tokens[1]);
-                    return "\nFile fetched successfully";
+                    if (new File(serverDir + "/" + tokens[1]).exists()) {
+                        writer.println("File fetched successfully");
+                        getFile(dataOut, tokens[1]);
+                    } else {
+                        writer.println("Error: File not found in the server.");
+                    }
                 }
                 break;
             case "/dir":
                 listFiles(writer);
-                return "\nFile list sent";
+                writer.println("File list sent");
+                break;
+            default:
+                writer.println("Invalid command");       
         }
-        return "Invalid command";
     }
 
 
@@ -128,14 +135,21 @@ public class FileExchangeServer {
     }
 
     // Inside the server's client-handling thread
-    private static void fetchFile(DataOutputStream clientData, String filename) throws IOException {
+    private static void getFile(DataOutputStream clientData, String filename) throws IOException {
         File file = new File(serverDir + "/" + filename);
         FileInputStream fileInputStream = new FileInputStream(file);
-        byte[] buffer = new byte[4096];
+        Long fileSize = file.length();
+
+        clientData.writeLong(fileSize);
+        clientData.flush();
+
+        byte[] buffer = new byte[1024];
         int bytesRead;
         while ((bytesRead = fileInputStream.read(buffer)) != -1) {
             clientData.write(buffer, 0, bytesRead);
         }
+
+        System.out.println("Server: File sent successfully\n");
         fileInputStream.close();
     }
 
