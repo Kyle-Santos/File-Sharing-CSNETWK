@@ -1,16 +1,20 @@
 package com.fes;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,20 +22,48 @@ public class FileExchangeServer {
     private static List<Socket> clientSockets = new ArrayList<>();
     private static List<String> registeredUsers = new ArrayList<>();
     private static int connectedClients = 0;
-    private static String serverDir =  "../../../../../ServerStorage";
-    private static String clientDir =  "../../../../../ClientStorage/";
+    private static final String serverDir =  "../../../../../ServerStorage";
+    private static final String clientDir =  "../../../../../ClientStorage/";
+    private static final String listUsers =  "../../../../../users.txt";
+    private static boolean serverRunning = true;
     
     public static void main(String[] args) {
         int nPort = Integer.parseInt(args[0]);
         ServerSocket serverSocket;
-		
-		try
-		{
-			serverSocket = new ServerSocket(nPort);
 
-            while (true) {
-                System.out.println("Server: Listening on port " + args[0] + "...");
-                System.out.println();
+        // load past users to registered users
+        File userstxt = new File(listUsers);
+
+        // Check if the file exists
+        if (!userstxt.exists()) {
+            try {
+                userstxt.createNewFile();
+                System.out.println("File created: " + userstxt.getAbsolutePath() + "\n");
+            } catch (IOException e) {
+                System.err.println("Error creating file: " + e.getMessage());
+                return; // or handle the case accordingly
+            }
+        }
+
+        // Use try-with-resources to automatically close resources
+        try (BufferedReader reader = new BufferedReader(new FileReader(listUsers))) {
+            String user;
+
+            // Read lines from the file
+            while ((user = reader.readLine()) != null) {
+                registeredUsers.add(user);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+		
+		try {
+            serverSocket = new ServerSocket(nPort);
+
+            while (serverRunning) {
+                System.out.println("Server: Listening on port " + args[0] + "...\n");
+                
                 Socket clientSocket = serverSocket.accept();
                 clientSockets.add(clientSocket);
                 connectedClients++;
@@ -60,23 +92,35 @@ public class FileExchangeServer {
                             connectedClients--;
 
                             if (connectedClients == 0) {
+                                try (BufferedWriter usersWriter = new BufferedWriter(new FileWriter(listUsers))) {
+                                    for (String user : registeredUsers) {
+                                        usersWriter.write(user);
+                                        usersWriter.newLine();
+                                    }
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+
                                 // Close the server after all clients have disconnected
                                 serverSocket.close();
+
+                                serverRunning = false;
                                 System.out.println("Server: Shutting down...");
                             } else {
-                                System.out.println("Server: Client disconnected.");
+                                System.out.println("Server: Client disconnected.\n");
                             }
                         } catch (IOException e) {
-                            e.printStackTrace();
+                            e.printStackTrace();   
                         }
                     }
                 });
-
                 clientThread.start();
             }
+        } catch (SocketException e) {
+            // Ignore SocketException when the server socket is closed intentionally
         } catch (IOException e) {
-            // e.printStackTrace();
-            System.out.println("\nServer closed.");
+            e.printStackTrace();
+            // System.out.println("\nServer closed.");
         }
     }
 
@@ -87,6 +131,13 @@ public class FileExchangeServer {
         String cmd = tokens[0];
 
         switch (cmd.toLowerCase()) {
+            case "/login":
+                if (registeredUsers.contains(tokens[1])) {
+                    writer.println("Welcome " + tokens[1] + " you are logged in!");
+                } else {
+                    writer.println("Username: " + tokens[1] + " do not exist. Register first, usage: /register <handle>");
+                }
+                break;
             case "/register":
                 if (registeredUsers.contains(tokens[1])) {
                     writer.println("Error: Registration failed. Handle or alias already exists.");

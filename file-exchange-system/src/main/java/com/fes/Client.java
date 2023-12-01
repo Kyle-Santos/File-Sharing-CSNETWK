@@ -23,6 +23,7 @@ public class Client {
         int nPort = 4020;
         boolean running = true;
         boolean registered = false;
+        boolean logged = false;
 
 		// while (true) {
         //     System.out.print("Enter command: ");
@@ -58,8 +59,33 @@ public class Client {
 
                 switch (command[0]) {
                     case "/leave":
-                        running = false; // exit the loop
+                        if (command.length == 1) {
+                            running = false; // exit the loop
+                        }
+                        else {
+                            System.out.println("\nError: Command parameters do not match or is not allowed.");
+                        }
                         break; 
+                    case "/login":
+                        if (command.length == 2) {
+
+                            if (!logged) {
+                                writer.println(input);
+                                response = reader.readLine();
+
+                                if (response.contains("logged in")) {
+                                    logged = true;
+                                    registered = true;
+                                }
+
+                                System.out.println("\n" + response);  
+                            } else {
+                                System.out.println("\nYou are logged in.");
+                            }
+                        } else {
+                            System.out.println("\nError: Command parameters do not match or is not allowed.");
+                        }
+                        break;
                     case "/register":
                         // check if command is valid
                         if (command.length == 2) {
@@ -83,7 +109,7 @@ public class Client {
                         }
                         break;
                     case "/store":
-                        if (registered) {
+                        if (logged) {
                             String fileName = command[1];
                             File fileToSend = new File(clientDir + username + "/" + fileName);
                             OutputStream outputStream = serverSocket.getOutputStream();
@@ -114,11 +140,11 @@ public class Client {
                             System.out.println("\n" + username + "<" + timestamp.format(formatter) + ">: Uploaded " + fileName);
                             fileInputStream.close();
                         } else {
-                            System.out.println("\nRegister yourself first. Usage: /register <handle>");
+                            System.out.println("\nRegister or Log in first. \nUsage: \n/register <handle> \n/login <username>");
                         }
                         break;
                     case "/dir":
-                        if (registered) {
+                        if (logged) {
                             writer.println(input);
 
                             System.out.println("\n---------------------------\n" +
@@ -129,11 +155,11 @@ public class Client {
                             }
                             reader.readLine();
                         } else {
-                            System.out.println("\nRegister yourself first. Usage: /register <handle>");
+                            System.out.println("\nRegister or Log in first. \nUsage: \n/register <handle> \n/login <username>");
                         }
                         break;         
                     case "/get":
-                        if (registered) {
+                        if (logged) {
                             String fileName1 = command[1];
                             
                             writer.println(input);
@@ -167,7 +193,7 @@ public class Client {
                                 fileOutputStream.close();
                             }
                         } else {
-                            System.out.println("\nRegister yourself first. Usage: /register <handle>");
+                            System.out.println("\nRegister or Log in first. \nUsage: \n/register <handle> \n/login <username>");
                         }
                         break;
                     case "/?":
@@ -192,12 +218,13 @@ public class Client {
 
     private static void showCommands() {
 		System.out.println("\nDescription => InputSyntax\n" + "--------------------------------\n" +
+                "Log in to the server => /login <username>\n" +
 				"Connect to the server application => /join <server_ip_add> <port>\n" +
 				"Disconnect to the server application => /leave\n" +
 				"Register a unique handle or alias  => /register <handle>\n" +
 				"Send file to server => /store <filename>\n" +
 				"Request directory file list from a server => /dir\n" +
 				"Fetch a file from a server => /get <filename>\n" +
-				"Request command help to output all Input Syntax commands for references => /?\n\n");
+				"Request command help to output all Input Syntax commands for references => /?\n");
 	}
 }
